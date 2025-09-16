@@ -1,96 +1,79 @@
-FROM rocker/shiny:latest
+FROM condaforge/mambaforge:24.3.0-0
 
-# Install Miniconda
-RUN apt-get update && apt-get install -y wget bzip2 nginx supervisor && \
-    wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
-    rm ~/miniconda.sh && \
-    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \ 
-    adduser --system --no-create-home --shell /bin/false --group --disabled-login nginx
+# Set non-interactive frontend and configure timezone for Asia/Dubai
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Dubai
 
+# Install and configure timezone non-interactively
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && \
+    ln -fs /usr/share/zoneinfo/Asia/Dubai /etc/localtime && \
+    dpkg-reconfigure --frontend noninteractive tzdata && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN /opt/conda/bin/conda install -c bioconda -c conda-forge mamba -y
+# Install system dependencies including nginx and supervisor
+RUN apt-get update && apt-get install -y \
+    nginx \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
 
+# Add a non-privileged user for nginx
+RUN adduser --system --no-create-home --shell /bin/false --group --disabled-login nginx
+
+# Copy environment.yaml first to leverage Docker cache
 COPY environment.yaml /srv/shiny-server/environment.yaml
 
-RUN /opt/conda/bin/mamba env create -f /srv/shiny-server/environment.yaml
+# Create the conda environment from the YAML file
+RUN mamba env create -f /srv/shiny-server/environment.yaml
 
-# Activate the environment and set the PATH
-ENV PATH=/opt/conda/envs/merged_env/bin:$PATH
+# Set the PATH to include the conda environment
+ENV PATH /opt/conda/envs/merged_env/bin:$PATH
 
-#RUN /opt/conda/bin/conda run -n merged_env R -e "devtools::install_github('smin95/smplot2')"
-RUN /opt/conda/bin/conda run -n merged_env  R -e "install.packages('smplot2', repos='http://cran.rstudio.com/')"
-RUN /opt/conda/bin/conda run -n merged_env  R -e "install.packages('GOplot', repos='http://cran.rstudio.com/')"
-RUN /opt/conda/bin/conda run -n merged_env  R -e "install.packages('wordcloud2', repos='http://cran.rstudio.com/')"
+# Combine all R package installations into a single layer
+RUN conda run -n merged_env R -e "\
+    install.packages(c('smplot2', 'GOplot', 'wordcloud2', 'Seurat'), repos='http://cran.rstudio.com/'); \
+    remotes::install_github('bnprks/BPCells/r'); \
+    devtools::install_github('mahmoudibrahim/genesorteR'); \
+    remotes::install_github('satijalab/seurat-wrappers'); \
+    remotes::install_github('daqana/dqshiny')"
 
-RUN /opt/conda/bin/conda run -n merged_env R -e "devtools::install_github('cole-trapnell-lab/monocle3')"
-RUN /opt/conda/bin/conda run -n merged_env R -e "devtools::install_github('mahmoudibrahim/genesorteR')"
-RUN /opt/conda/bin/conda run -n merged_env R -e "remotes::install_github('satijalab/seurat-wrappers')"
-RUN /opt/conda/bin/conda run -n merged_env R -e "remotes::install_github('daqana/dqshiny')"
-RUN /opt/conda/bin/conda run -n merged_env R -e "install.packages('Seurat', repos ='https://cran.nyuad.nyu.edu/')"
+
+#Installation of monocle
+SHELL ["/bin/bash", "-c"]
+
+RUN source activate merged_env && \
+    R -e "devtools::install_github('cole-trapnell-lab/monocle3', force = TRUE)"
+
 
 # Clean stale data
-RUN /opt/conda/bin/conda clean -a -y
+RUN mamba clean -a -y
 
-
-
-# animalcules
-COPY animalcules  /srv/shiny-server/animalcules
-
-# ATACseqQCShniy
+# Copy all application directories in one command
+COPY animalcules /srv/shiny-server/animalcules
 COPY ATACseqQCShniy /srv/shiny-server/ATACseqQCShniy
-COPY BSgenome.Hsapiens.UCSC.hg19_1.4.3.tar.gz /
-
-
-# ClusterProfShinyGSEA
 COPY ClusterProfShinyGSEA /srv/shiny-server/ClusterProfShinyGSEA
-
-
-#ClusterProfShinyORA
 COPY ClusterProfShinyORA /srv/shiny-server/ClusterProfShinyORA
-
-#dada2Shiny
-COPY dada2Shiny  /srv/shiny-server/dada2Shiny
-
-#deseq2shiny
+COPY dada2Shiny /srv/shiny-server/dada2Shiny
 COPY deseq2shiny /srv/shiny-server/deseq2shiny
-
-#debrowser
 COPY DEBrowser /srv/shiny-server/DEBrowser
-
-
-# GeneCountMerger
 COPY GeneCountMerger /srv/shiny-server/GeneCountMerger
-
-
-#monocle3
 COPY monocle3 /srv/shiny-server/monocle3
-
-#SeuratV5Shiny
 COPY SeuratV5Shiny /srv/shiny-server/SeuratV5Shiny
-
-#mergeFPKMs
 COPY mergeFPKMs /srv/shiny-server/mergeFPKMs
-
-#mergeFPKMs
 COPY tsar_nasqar /srv/shiny-server/tsar_nasqar
 
+# # Copy BSgenome package  
+COPY BSgenome.Hsapiens.UCSC.hg19_1.4.3.tar.gz /
 
+# # Install BSgenome package
+RUN conda run -n merged_env R CMD INSTALL /BSgenome.Hsapiens.UCSC.hg19_1.4.3.tar.gz
 
-
-
-
-# Copy your Shiny app files to the container
-
-# Add Nginx configuration
+# Copy configuration files
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY uiApp/src/out/ /usr/share/nginx/html
-
-
-
-# Add the supervisor configuration file
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-RUN sed -i 's|/opt/conda/envs/v_[^/ ]*|/opt/conda/envs/merged_env|g'  /etc/supervisor/conf.d/supervisord.conf
+
+# Update supervisor configuration with correct path
+RUN sed -i 's|/opt/conda/envs/v_[^/]*|/opt/conda/envs/merged_env|g' /etc/supervisor/conf.d/supervisord.conf
 
 # Expose the port for the Nginx server
 EXPOSE 80

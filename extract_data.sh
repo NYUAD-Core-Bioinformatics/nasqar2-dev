@@ -15,12 +15,12 @@ export filename=data.zip
 
 unzip data.zip
 
-cp -r data/dada2Shiny/www  dada2Shiny/
-cp -r data/deseq2shiny/www  deseq2shiny/
-cp -r data/ClusterProfShinyORA/www  ClusterProfShinyORA/
-cp -r data/ClusterProfShinyGSEA/www  ClusterProfShinyGSEA/
-cp -r data/DEApp/www  DEApp/
-cp -r data/GeneCountMerger/www GeneCountMerger/
-cp -r  data/NASQAR/tsar_nasqar/www      NASQAR/tsar_nasqar
-cp -r  data/NASQAR/mergeFPKMs/www      NASQAR/mergeFPKMs
-cp -r  data/ATACseqQCShniy/www      ATACseqQCShniy/
+cp -r data/dada2Shiny/www  dada2Shiny/src/
+cp -r data/deseq2shiny/www  deseq2shiny/src/
+cp -r data/ClusterProfShinyORA/www  ClusterProfShinyORA/src/
+cp -r data/ClusterProfShinyGSEA/www  ClusterProfShinyGSEA/src/
+cp -r data/DEApp/www  DEApp/src/
+cp -r data/GeneCountMerger/www GeneCountMerger/src/
+cp -r  data/NASQAR/tsar_nasqar/www      tsar_nasqar/src/
+cp -r  data/NASQAR/mergeFPKMs/www      mergeFPKMs/src/
+cp -r  data/ATACseqQCShniy/www      ATACseqQCShniy/src/

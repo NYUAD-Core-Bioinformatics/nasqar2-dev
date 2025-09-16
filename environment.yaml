@@ -13,6 +13,7 @@ dependencies:
 - r-biocmanager
 - r-car
 - r-clustree
+- r-colourpicker
 - r-devtools
 - r-dplyr
 - r-dt
@@ -42,6 +43,7 @@ dependencies:
 - r-rhandsontable
 - r-rspectra
 - r-rstatix
+- r-seurat
 - r-sf
 - r-shiny
 - r-shinyBS
@@ -49,7 +51,6 @@ dependencies:
 - r-shinydashboard
 - r-shinyjs
 - r-sodium
-- r-spdep
 - r-stringr
 - r-terra
 - r-tidyr
@@ -87,6 +88,7 @@ dependencies:
 - bioconductor-singlecellexperiment
 - bioconductor-summarizedexperiment
 - bioconductor-sva
+- binutils
 - biom-format
 - bpp-core
 - gcc_linux-64

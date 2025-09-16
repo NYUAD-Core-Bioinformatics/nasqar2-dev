@@ -20,7 +20,8 @@ dependencies:
   - r-Matrix
   - r-clustree
   - r-sf
-  - r-spdep
+  - r-seurat
+  - binutils
   - bioconductor-biocgenerics
   - bioconductor-delayedarray
   - bioconductor-delayedmatrixstats
