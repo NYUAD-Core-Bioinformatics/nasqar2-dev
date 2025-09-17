@@ -251,7 +251,13 @@ csvDataReactive <- eventReactive(input$submit, {
 
 
     myValues$DF <- samples
-    myValues$DF[] <- lapply(myValues$DF, as.factor)
+    myValues$DF[] <- lapply(myValues$DF, function(x) {
+        if (is.character(x) || is.factor(x)) {
+            as.factor(x)
+        } else {
+            x
+        }
+    })
 
     updateDesignFormula()
 

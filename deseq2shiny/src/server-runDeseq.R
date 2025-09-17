@@ -120,10 +120,36 @@ ddsReactive <- eventReactive(input$run_deseq2, {
 
         factorChoices <- factorChoices[!(factorChoices %in% c("sizeFactor", "replaceable"))]
 
+        # Filter factorChoices to only include categorical factors that are in the design formula
+        design_terms <- labels(terms(design(dds)))
+        print("Design formula terms:")
+        print(design_terms)
+        print("Available factor choices:")
+        print(factorChoices)
+        
+        validFactorChoices <- getValidCategoricalFactors(factorChoices, design_terms, myValues$DF)
+        
+        print("Valid categorical factor choices:")
+        print(validFactorChoices)
+        
+        # If no valid factors found, keep original list but add warning
+        if (length(validFactorChoices) == 0) {
+            print("Warning: No categorical factors from design formula found for differential analysis")
+            validFactorChoices <- factorChoices
+        }
+
         updateSelectizeInput(session, "resultNamesInput", choices = resultsNames(dds), selected = NULL)
-        updateSelectizeInput(session, "factorNameInput", choices = factorChoices, selected = factorChoices[1])
+        updateSelectizeInput(session, "factorNameInput", choices = validFactorChoices, selected = if(length(validFactorChoices) > 0) validFactorChoices[1] else NULL)
 
-
+        # Update condition dropdowns now that DESeq2 analysis is complete
+        if (!is.null(input$factorNameInput) && input$factorNameInput != "" && 
+            input$factorNameInput %in% validFactorChoices) {
+            factor_levels <- levels(myValues$DF[, input$factorNameInput])
+            if (length(factor_levels) >= 2) {
+                updateSelectInput(session, "condition1", choices = factor_levels)
+                updateSelectInput(session, "condition2", choices = factor_levels)
+            }
+        }
 
         disable("data_file_type")
         disable("no_replicates")
@@ -151,12 +177,64 @@ observeEvent(input$factorNameInput,
             return()
         }
         
-        myValues$DF[] <- lapply(myValues$DF, as.factor)
+        # Only populate conditions if DESeq2 analysis has been completed and results exist
+        if (is.null(myValues$dds)) {
+            print("DESeq2 analysis not completed - conditions will be populated after analysis")
+            updateSelectInput(session, "condition1", choices = NULL)
+            updateSelectInput(session, "condition2", choices = NULL)
+            return()
+        }
+        
+        myValues$DF[] <- lapply(myValues$DF, function(x) {
+            if (is.character(x) || is.factor(x)) {
+                as.factor(x)
+            } else {
+                x
+            }
+        })
+        
+        # Verify that the factor is present in the design formula and results
+        design_terms <- labels(terms(design(myValues$dds)))
+        if (!(input$factorNameInput %in% design_terms)) {
+            print(paste("Factor", input$factorNameInput, "not found in design formula"))
+            updateSelectInput(session, "condition1", choices = NULL)
+            updateSelectInput(session, "condition2", choices = NULL)
+            return()
+        }
+        
+        # Verify that the factor is actually categorical (not continuous)
+        factor_data <- myValues$DF[, input$factorNameInput]
+        if (!isCategoricalFactor(factor_data, nrow(myValues$DF))) {
+            print(paste("Factor", input$factorNameInput, "appears to be continuous, not suitable for categorical comparison"))
+            updateSelectInput(session, "condition1", choices = NULL)
+            updateSelectInput(session, "condition2", choices = NULL)
+            return()
+        }
+        
         # print(levels(factor(myValues$DF[,input$factorNameInput])))
         print("factorNameInput changed")
-        print(levels(myValues$DF[, input$factorNameInput]))
-        updateSelectInput(session, "condition1", choices = levels(myValues$DF[, input$factorNameInput]))
-        updateSelectInput(session, "condition2", choices = levels(myValues$DF[, input$factorNameInput]))
+        
+        # Get factor levels properly, converting to factor if necessary
+        factor_data <- myValues$DF[, input$factorNameInput]
+        
+        # Convert to factor if it's not already one
+        if (!is.factor(factor_data)) {
+            factor_data <- as.factor(factor_data)
+        }
+        
+        factor_levels <- levels(factor_data)
+        print(paste("Factor levels:", paste(factor_levels, collapse = ", ")))
+        
+        # Only populate if there are at least 2 levels for comparison
+        if (length(factor_levels) < 2) {
+            print(paste("Factor", input$factorNameInput, "must have at least 2 levels for differential analysis"))
+            updateSelectInput(session, "condition1", choices = NULL)
+            updateSelectInput(session, "condition2", choices = NULL)
+            return()
+        }
+        
+        updateSelectInput(session, "condition1", choices = factor_levels)
+        updateSelectInput(session, "condition2", choices = factor_levels)
     },
     ignoreInit = T
 )

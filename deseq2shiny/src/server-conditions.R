@@ -25,12 +25,17 @@ observeEvent(input$removeCol, {
     myValues$DF[, input$colToRemove] <- NULL
     updateDesignFormula()
     
-    # Update factorNameInput choices if it exists
-    if (exists("input") && !is.null(input) && "factorNameInput" %in% names(input)) {
+    # Update factorNameInput choices only if DESeq2 analysis is completed
+    if (exists("input") && !is.null(input) && "factorNameInput" %in% names(input) && !is.null(myValues$dds)) {
         factorChoices <- colnames(myValues$DF)
         factorChoices <- factorChoices[!(factorChoices %in% c("sizeFactor", "replaceable"))]
-        if (length(factorChoices) > 0) {
-            updateSelectizeInput(session, "factorNameInput", choices = factorChoices, selected = factorChoices[1])
+        
+        # Filter to only include categorical factors that are in the design formula
+        design_terms <- labels(terms(design(myValues$dds)))
+        validFactorChoices <- getValidCategoricalFactors(factorChoices, design_terms, myValues$DF)
+        
+        if (length(validFactorChoices) > 0) {
+            updateSelectizeInput(session, "factorNameInput", choices = validFactorChoices, selected = validFactorChoices[1])
         }
     }
 })
@@ -157,7 +162,13 @@ metadataFileReactive <- reactive({
     metaData <- data.frame(fileContent[, colnames(fileContent)[-1]])
     colnames(metaData) <- colnames(fileContent)[-1]
 
-    metaData[] <- lapply(metaData, as.factor)
+    metaData[] <- lapply(metaData, function(x) {
+        if (is.character(x) || is.factor(x)) {
+            as.factor(x)
+        } else {
+            x
+        }
+    })
     print("metaData")
     print(fileContent[, 1])
     print("metaData")

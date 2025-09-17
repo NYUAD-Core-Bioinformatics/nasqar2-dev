@@ -28,16 +28,29 @@ tabItem(
                             12,
                             selectizeInput("factorNameInput", "Factor Name", choices = c("Intercept"))
                         ),
-                        column(3, selectInput("condition1", "Condition 1", choices = NULL)),
-                        column(
-                            1,
-                            tags$div(
-                                class = "form-group",
-                                tags$label(" "),
-                                p(strong("VS"))
-                            )
+                        conditionalPanel(
+                            "output.ddsComputed",
+                            column(3, selectInput("condition1", "Condition 1", choices = NULL)),
+                            column(
+                                1,
+                                tags$div(
+                                    class = "form-group",
+                                    tags$label(" "),
+                                    p(strong("VS"))
+                                )
+                            ),
+                            column(3, selectInput("condition2", "Condition 2", choices = NULL))
                         ),
-                        column(3, selectInput("condition2", "Condition 2", choices = NULL))
+                        conditionalPanel(
+                            "!output.ddsComputed",
+                            column(
+                                12,
+                                div(class = "alert alert-info", 
+                                    style = "margin-top: 10px;",
+                                    p(strong("Note:"), "Condition selections will be available after DESeq2 analysis is completed.")
+                                )
+                            )
+                        )
                     )
                 ),
                 column(
